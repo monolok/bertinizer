@@ -1,14 +1,15 @@
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import LabelEncoder
-import numpy as np
 
 def plot_dataset(df, y=None, columns='all', corr=0.5):
     """
     Automatically generates plots for specified numerical and categorical columns in a DataFrame.
-    If a target variable 'y' is provided, it also generates a correlation matrix plot and checks for strongly
-    correlated columns based on the specified threshold.
+    If a target variable 'y' is provided, it also generates a correlation matrix plot, checks for strongly
+    correlated columns, and ensures all columns are suitable for correlation analysis by converting
+    categorical columns to numeric.
     
     Parameters:
     - df: pd.DataFrame, the input DataFrame with features.
@@ -16,31 +17,27 @@ def plot_dataset(df, y=None, columns='all', corr=0.5):
     - columns: list or 'all', optional, specifies the columns to include. Defaults to 'all'.
     - corr: float, optional, the correlation threshold for identifying strong correlations. Defaults to 0.5.
     """
+    # Copy the DataFrame to avoid modifying the original
+    df = df.copy()
+    
     # Filter columns if 'columns' parameter is not 'all'
     if columns != 'all':
         df = df[[*columns, y]] if y and y in df else df[columns]
     
-    # Identify numerical and categorical columns
-    numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    # Encoding all categorical variables in the DataFrame
+    le = LabelEncoder()
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        df[col] = le.fit_transform(df[col].astype(str))
+        
+    # Identify numerical and categorical columns after encoding
+    numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
     
     # Plot for numerical columns
     for col in numerical_cols:
         fig = px.histogram(df, x=col, marginal="box", color=y if y else None, title=f"Distribution of {col}")
         fig.show()
         
-    # Plot for categorical columns
-    for col in categorical_cols:
-        fig = px.bar(df, x=col, color=y if y else None, title=f"Distribution of {col}")
-        fig.show()
-
-    # If y is provided, generate correlation matrix plot
-    if y:
-        # Encoding all categorical variables
-        for col in categorical_cols:
-            le = LabelEncoder()
-            df[col] = le.fit_transform(df[col])
-            
     # Calculating correlation matrix
     corr_matrix = df.corr()
 
@@ -65,6 +62,7 @@ def plot_dataset(df, y=None, columns='all', corr=0.5):
         print(strong_corr_pairs)
     else:
         print("No strongly correlated pairs found above the threshold.")
+
 
 
 def find_outliers(df, columns='all', std=3):
