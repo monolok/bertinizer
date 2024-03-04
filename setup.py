@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='bertinizer',
-    version='0.2',
+    version='0.3',
     packages=find_packages(),
     description='A utility for fast EDA and plots',
     long_description=open('README.md').read(),
