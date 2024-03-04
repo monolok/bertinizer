@@ -71,8 +71,6 @@ def plot_dataset(df, y=None, columns='all', corr=0.5):
         print("No strongly correlated pairs found above the threshold.")
 
 
-
-
 def find_outliers(df, columns='all', std=3):
     """
     Identifies outliers in the specified columns of a DataFrame based on the standard deviation.
