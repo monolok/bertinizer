@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import LabelEncoder
+import numpy as np
 
 def plot_dataset(df, y=None, columns='all', corr=0.5):
     """
