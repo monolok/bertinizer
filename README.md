@@ -7,7 +7,7 @@ Bertinizer is a utility designed for fast Exploratory Data Analysis (EDA) and cr
 You can install Bertinizer directly from GitHub using pip:
 
 ```bash
-pip install git+https://github.com/yourusername/bertinizer.git
+pip install git+https://github.com/monolok/bertinizer.git
 
 ## Importing
 from bertinizer.files import plot_dataset
