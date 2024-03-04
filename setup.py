@@ -15,7 +15,7 @@ setup(
     python_requires='>=3.6',
     author='Antoine Bertin',
     author_email='monolok35@gmail.com',
-    url='https://github.com/yourusername/bertinizer',
+    url='https://github.com/monolok/bertinizer',
     license='MIT',
     classifiers=[
         'Development Status :: 1 - Planning',
