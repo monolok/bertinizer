@@ -19,3 +19,6 @@ plot_dataset(df, y=None)
 
 ## Explain
 print(plot_dataset.__doc__)
+
+## Upgrade
+pip install git+https://github.com/monolok/bertinizer.git --upgrade
