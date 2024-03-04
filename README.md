@@ -15,7 +15,7 @@ from bertinizer import plot_dataset
 ## Using
 import pandas as pd
 df = pd.read_csv('your_dataset.csv')
-plot_dataset(df, y=None)
+plot_dataset(df, y=None, columns='all')
 
 ## Explain
 print(plot_dataset.__doc__)
