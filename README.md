@@ -10,12 +10,12 @@ You can install Bertinizer directly from GitHub using pip:
 pip install git+https://github.com/monolok/bertinizer.git
 
 ## Importing
-from bertinizer.files import plot_dataset
+from bertinizer import plot_dataset
 
 ## Using
 import pandas as pd
 df = pd.read_csv('your_dataset.csv')
-plot_dataset(df, 'your_target_column')
+plot_dataset(df, y=None)
 
 ## Explain
 print(plot_dataset.__doc__)
