@@ -137,3 +137,41 @@ def find_outliers(df, columns='all', std=3):
             outliers_info_dict[col] = (outliers_count, outliers_percentage)
     
     return outliers_info_dict
+
+def dataset_overview(df, remove_nan=False):
+    """
+    Analyzes a given DataFrame and provides an overview of its structure and contents.
+    Optionally removes NaN values.
+
+    Parameters:
+    - df: pd.DataFrame - The DataFrame to be analyzed.
+    - remove_nan: bool - If True, removes rows with any NaN values. Defaults to False.
+
+    Returns:
+    - info: str - A summary of the dataset's structure and content.
+    - modified_df: pd.DataFrame - The DataFrame after optional NaN removal.
+    """
+    
+    # Initial analysis
+    info = []
+    info.append(f"Shape of the DataFrame: {df.shape}")
+    info.append(f"Data Types:\n{df.dtypes}")
+    info.append(f"Count of non-null values:\n{df.count()}")
+    info.append(f"Number of unique values:\n{df.nunique()}")
+    info.append(f"Statistics for numerical columns:\n{df.describe()}")
+
+    # Check for NaN values
+    nan_counts = df.isnull().sum()
+    info.append(f"NaN values in each column:\n{nan_counts}")
+
+    # Removing NaN values if requested
+    modified_df = df.copy()
+    if remove_nan:
+        modified_df.dropna(inplace=True)
+        info.append("NaN values have been removed.")
+        info.append(f"New shape of the DataFrame: {modified_df.shape}")
+
+    # Joining info messages into a single string
+    info_str = "\n\n".join(info)
+    
+    return info_str, modified_df

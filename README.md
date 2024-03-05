@@ -16,14 +16,16 @@ from bertinizer import plot_data, analyze_correlation, find_outliers
 import pandas as pd
 df = pd.read_csv('your_dataset.csv')
 
-def plot_data(df, y=None, columns='all')
-def analyze_correlation(df, y=None, columns='all', corr=0.5)
-def find_outliers(df, columns='all', std=3)
+plot_data(df, y=None, columns='all')
+analyze_correlation(df, y=None, columns='all', corr=0.5)
+find_outliers(df, columns='all', std=3)
+dataset_overview(df, remove_nan=False)
 
 ## Explain
 print(plot_data.__doc__)
 print(analyze_correlation.__doc__)
 print(find_outliers.__doc__)
+print(dataset_overview.__doc__)
 
 ## Upgrade
 pip install git+https://github.com/monolok/bertinizer.git --upgrade
