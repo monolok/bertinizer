@@ -2,11 +2,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelEncoder
+import warnings
 
 def plot_data(df, y=None, columns='all'):
     """
@@ -142,49 +141,39 @@ def find_outliers(df, columns='all', std=3):
     
     return outliers_info_dict
 
-def dataset_overview(df, remove_nan=False):
+def dataset_overview_simplified(df, remove_nan=False):
     """
-    Analyzes a given DataFrame and provides an overview of its structure and contents.
-    Optionally removes NaN values.
+    Analyzes a given DataFrame and provides a simplified overview of its structure and contents.
+    Optionally removes rows or columns with NaN values.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to be analyzed.
     - remove_nan: bool - If True, removes rows with any NaN values. Defaults to False.
 
     Returns:
-    - info: str - A summary of the dataset's structure and content.
+    - overview_df: pd.DataFrame - A DataFrame containing the summary of the dataset's structure and content.
     - modified_df: pd.DataFrame - The DataFrame after optional NaN removal.
     """
     
-    # Initial analysis
-    info = []
-    info.append(f"Shape of the DataFrame: {df.shape}")
-    info.append(f"Data Types:\n{df.dtypes}")
-    info.append(f"Count of non-null values:\n{df.count()}")
-    info.append(f"Number of unique values:\n{df.nunique()}")
-    info.append(f"Statistics for numerical columns:\n{df.describe()}")
-
-    # Check for NaN values
-    nan_counts = df.isnull().sum()
-    info.append(f"NaN values in each column:\n{nan_counts}")
-
+    # Creating summary DataFrame
+    overview_df = pd.DataFrame({
+        "Data Type": df.dtypes,
+        "Non-Null Count": df.notnull().sum(),
+        "Unique Values": df.nunique(),
+        "NaN Values": df.isnull().sum()
+    })
+    
     # Removing NaN values if requested
     modified_df = df.copy()
     if remove_nan:
         modified_df.dropna(inplace=True)
-        info.append("NaN values have been removed.")
-        info.append(f"New shape of the DataFrame: {modified_df.shape}")
 
-    # Joining info messages into a single string
-    info_str = "\n\n".join(info)
-    
-    return info_str, modified_df
+    return overview_df, modified_df
 
-def apply_pca(df, columns='all', pca_min=0.5):
+def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     """
-    Applies PCA to the given DataFrame, optionally only to specified columns.
-    Normalizes numerical values and encodes categorical values before PCA.
-    More robust handling for DataFrames with only numerical or categorical columns.
+    Applies PCA to the given DataFrame, focusing only on numerical columns.
+    Warns if categorical columns are detected and excludes them from processing.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to process.
@@ -199,24 +188,19 @@ def apply_pca(df, columns='all', pca_min=0.5):
     
     # Identify numerical and categorical columns
     numeric_features = df.select_dtypes(include=['int64', 'float64']).columns
-    categorical_features = df.select_dtypes(include=['object', 'bool']).columns
+    categorical_features = df.select_dtypes(exclude=['int64', 'float64']).columns
     
-    transformers = []
-    if numeric_features.any():
-        transformers.append(('num', Pipeline(steps=[
-            ('scaler', StandardScaler())]), numeric_features))
-    if categorical_features.any():
-        transformers.append(('cat', Pipeline(steps=[
-            ('onehot', OneHotEncoder(handle_unknown='ignore'))]), categorical_features))
-
-    preprocessor = ColumnTransformer(transformers=transformers)
+    # Warn if categorical columns are present
+    if not categorical_features.empty:
+        warnings.warn("Categorical columns detected and will not be used in PCA.")
     
-    # Apply transformations
-    df_transformed = preprocessor.fit_transform(df)
+    # Apply StandardScaler to numerical columns
+    scaler = StandardScaler()
+    df_numerical_scaled = scaler.fit_transform(df[numeric_features])
     
     # Apply PCA
     pca = PCA(n_components=pca_min, svd_solver='full')
-    pca.fit(df_transformed)
+    pca.fit(df_numerical_scaled)
     
     # Return the variance ratio for each PCA component
     return pca.explained_variance_ratio_
