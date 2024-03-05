@@ -171,8 +171,10 @@ def dataset_overview_simplified(df, remove_nan=False):
 def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     """
     Applies PCA to the given DataFrame, focusing only on numerical columns.
-    Warns if categorical columns are detected and excludes them from processing.
-    Returns variance ratios in a DataFrame and prints details about PCA application.
+    Checks if removing NaN values results in losing more than 15% of the data.
+    If so, issues a warning and halts further processing.
+    Otherwise, returns a DataFrame that includes variance ratios for PCA components,
+    identifies non-processed categorical columns, and integrates information on missing value removal.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to process.
@@ -180,37 +182,71 @@ def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     - pca_min: float - Minimum variance that PCA must explain.
 
     Returns:
-    - pca_variance_df: pd.DataFrame - A DataFrame containing the variance ratio for each PCA component.
+    - result_df: pd.DataFrame - A DataFrame containing the PCA analysis summary and missing value information, or an empty DataFrame with a warning if significant data loss is detected.
     """
     if columns != 'all':
         df = df[columns]
     
-    # Identify numerical and categorical columns
-    numeric_features = df.select_dtypes(include=['int64', 'float64']).columns
-    categorical_features = df.select_dtypes(exclude=['int64', 'float64']).columns
+    # Record original size for missing value calculations
+    original_size = len(df)
     
-    # Warn if categorical columns are present
-    if not categorical_features.empty:
-        warnings.warn("Categorical columns detected and will not be used in PCA.")
+    # Remove rows with any missing values and calculate the impact
+    df_dropped_na = df.dropna()
+    removed_na_count = original_size - len(df_dropped_na)
+    removed_na_percentage = (removed_na_count / original_size) * 100 if original_size > 0 else 0
     
-    original_dimensions = len(numeric_features)
+    # Check if more than 15% of the data would be removed, if so, issue a warning
+    if removed_na_percentage > 15:
+        warnings.warn("Removing NaN values results in losing more than 15% of the dataset. Consider alternative missing value handling.")
+        return pd.DataFrame()  # Return an empty DataFrame as a signal of halting the operation
     
-    # Apply StandardScaler to numerical columns
-    scaler = StandardScaler()
-    df_numerical_scaled = scaler.fit_transform(df[numeric_features])
+    # Identify numerical and categorical columns after dropping NA
+    numeric_features = df_dropped_na.select_dtypes(include=np.number).columns
+    categorical_features = df_dropped_na.select_dtypes(exclude=np.number).columns
+
+    # Apply StandardScaler to numerical columns and fit PCA
+    pca_components, variance_ratios = 0, []
+    if len(numeric_features) > 0:
+        scaler = StandardScaler()
+        scaled_numeric_df = scaler.fit_transform(df_dropped_na[numeric_features])
+        pca = PCA(n_components=pca_min, svd_solver='full')
+        pca.fit(scaled_numeric_df)
+        pca_components = pca.n_components_
+        variance_ratios = pca.explained_variance_ratio_
     
-    # Apply PCA
-    pca = PCA(n_components=pca_min, svd_solver='full')
-    pca.fit(df_numerical_scaled)
-    pca_components = pca.n_components_
+    # Building the summary information
+    summary_info = {
+        'Component': [],
+        'Variance Ratio': [],
+        'Status': [],
+        'Info': []
+    }
     
-    # Print details
-    print(f"Minimum variance for PCA: {pca_min}")
-    print(f"Original number of dimensions: {original_dimensions}")
-    print(f"Number of PCA components: {pca_components}")
+    # Add PCA component information
+    for i in range(pca_components):
+        summary_info['Component'].append(f'PCA {i+1}')
+        summary_info['Variance Ratio'].append(variance_ratios[i])
+        summary_info['Status'].append('Processed')
+        summary_info['Info'].append('')
+        
+    # Add categorical column information
+    for cat_col in categorical_features:
+        summary_info['Component'].append(cat_col)
+        summary_info['Variance Ratio'].append('N/A')
+        summary_info['Status'].append('Non-processed (Categorical)')
+        summary_info['Info'].append('')
     
-    # Prepare the variance ratio DataFrame
-    pca_variance_df = pd.DataFrame(pca.explained_variance_ratio_, columns=['Variance Ratio'],
-                                   index=[f'PCA {i+1}' for i in range(pca_components)])
+    # Add missing value information
+    summary_info['Component'].append('Missing Value Info')
+    summary_info['Variance Ratio'].append('N/A')
+    summary_info['Status'].append('Missing Value Removal')
+    summary_info['Info'].append(f'Missing values removed: {removed_na_count}, Percentage of total: {removed_na_percentage:.2f}%')
+
+    # Additional PCA information
+    if pca_components > 0:
+        summary_info['Info'][0] = f'Minimum variance for PCA: {pca_min}, Original dimensions: {len(numeric_features)}, PCA components: {pca_components}'
     
-    return pca_variance_df
+    # Construct final summary DataFrame
+    result_df = pd.DataFrame(summary_info)
+    
+    return result_df.reset_index(drop=True)
