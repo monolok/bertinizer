@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 
 def plot_data(df, y=None, columns='all'):
@@ -175,3 +179,44 @@ def dataset_overview(df, remove_nan=False):
     info_str = "\n\n".join(info)
     
     return info_str, modified_df
+
+def apply_pca(df, columns='all', pca_min=0.5):
+    """
+    Applies PCA to the given DataFrame, optionally only to specified columns.
+    Normalizes numerical values and encodes categorical values before PCA.
+    More robust handling for DataFrames with only numerical or categorical columns.
+
+    Parameters:
+    - df: pd.DataFrame - The DataFrame to process.
+    - columns: list or 'all' - Specific columns to consider or 'all' for the entire DataFrame.
+    - pca_min: float - Minimum variance that PCA must explain.
+
+    Returns:
+    - variance: np.array - The variance ratio for each PCA component.
+    """
+    if columns != 'all':
+        df = df[columns]
+    
+    # Identify numerical and categorical columns
+    numeric_features = df.select_dtypes(include=['int64', 'float64']).columns
+    categorical_features = df.select_dtypes(include=['object', 'bool']).columns
+    
+    transformers = []
+    if numeric_features.any():
+        transformers.append(('num', Pipeline(steps=[
+            ('scaler', StandardScaler())]), numeric_features))
+    if categorical_features.any():
+        transformers.append(('cat', Pipeline(steps=[
+            ('onehot', OneHotEncoder(handle_unknown='ignore'))]), categorical_features))
+
+    preprocessor = ColumnTransformer(transformers=transformers)
+    
+    # Apply transformations
+    df_transformed = preprocessor.fit_transform(df)
+    
+    # Apply PCA
+    pca = PCA(n_components=pca_min, svd_solver='full')
+    pca.fit(df_transformed)
+    
+    # Return the variance ratio for each PCA component
+    return pca.explained_variance_ratio_

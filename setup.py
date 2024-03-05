@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='bertinizer',
-    version='0.7',  # Incrementing the version to reflect the addition/update of functionality
+    version='0.8',  # Incrementing the version to reflect the addition/update of functionality
     packages=find_packages(),
     description='A utility for fast EDA and plots, including features for outlier detection and handling categorical data in correlation analysis.',
     long_description=open('README.md').read(),
