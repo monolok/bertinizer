@@ -144,36 +144,35 @@ def find_outliers(df, columns='all', std=3):
 def dataset_overview_simplified(df, remove_nan=False):
     """
     Analyzes a given DataFrame and provides a simplified overview of its structure and contents.
-    Optionally removes rows or columns with NaN values.
+    Optionally removes rows with NaN values directly in the passed DataFrame if remove_nan is True.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to be analyzed.
-    - remove_nan: bool - If True, removes rows with any NaN values. Defaults to False.
+    - remove_nan: bool - If True, removes rows with any NaN values in the original DataFrame.
 
     Returns:
     - overview_df: pd.DataFrame - A DataFrame containing the summary of the dataset's structure and content.
-    - modified_df: pd.DataFrame - The DataFrame after optional NaN removal.
     """
     
-    # Creating summary DataFrame
+    # Removing NaN values if requested
+    if remove_nan:
+        df.dropna(inplace=True)
+    
+    # Creating summary DataFrame after any modifications
     overview_df = pd.DataFrame({
         "Data Type": df.dtypes,
         "Non-Null Count": df.notnull().sum(),
         "Unique Values": df.nunique(),
         "NaN Values": df.isnull().sum()
     })
-    
-    # Removing NaN values if requested
-    modified_df = df.copy()
-    if remove_nan:
-        modified_df.dropna(inplace=True)
 
-    return overview_df, modified_df
+    return overview_df
 
 def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     """
     Applies PCA to the given DataFrame, focusing only on numerical columns.
     Warns if categorical columns are detected and excludes them from processing.
+    Returns variance ratios in a DataFrame and prints details about PCA application.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to process.
@@ -181,7 +180,7 @@ def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     - pca_min: float - Minimum variance that PCA must explain.
 
     Returns:
-    - variance: np.array - The variance ratio for each PCA component.
+    - pca_variance_df: pd.DataFrame - A DataFrame containing the variance ratio for each PCA component.
     """
     if columns != 'all':
         df = df[columns]
@@ -194,6 +193,8 @@ def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     if not categorical_features.empty:
         warnings.warn("Categorical columns detected and will not be used in PCA.")
     
+    original_dimensions = len(numeric_features)
+    
     # Apply StandardScaler to numerical columns
     scaler = StandardScaler()
     df_numerical_scaled = scaler.fit_transform(df[numeric_features])
@@ -201,6 +202,15 @@ def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     # Apply PCA
     pca = PCA(n_components=pca_min, svd_solver='full')
     pca.fit(df_numerical_scaled)
+    pca_components = pca.n_components_
     
-    # Return the variance ratio for each PCA component
-    return pca.explained_variance_ratio_
+    # Print details
+    print(f"Minimum variance for PCA: {pca_min}")
+    print(f"Original number of dimensions: {original_dimensions}")
+    print(f"Number of PCA components: {pca_components}")
+    
+    # Prepare the variance ratio DataFrame
+    pca_variance_df = pd.DataFrame(pca.explained_variance_ratio_, columns=['Variance Ratio'],
+                                   index=[f'PCA {i+1}' for i in range(pca_components)])
+    
+    return pca_variance_df
