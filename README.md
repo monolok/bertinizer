@@ -10,7 +10,7 @@ You can install Bertinizer directly from GitHub using pip:
 pip install git+https://github.com/monolok/bertinizer.git
 
 ## Importing
-from bertinizer import plot_data, analyze_correlation, find_outliers
+from bertinizer import plot_data, analyze_correlation, find_outliers, dataset_overview
 
 ## Using
 import pandas as pd
