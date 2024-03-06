@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelEncoder
+from sklearn.cluster import KMeans
 import warnings
 
 def plot_data(df, y=None, columns='all'):
@@ -168,7 +169,7 @@ def dataset_overview_simplified(df, remove_nan=False):
 
     return overview_df
 
-def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
+def find_pca_num_only(df, columns='all', pca_min=0.5):
     """
     Applies PCA to the given DataFrame, focusing only on numerical columns.
     Checks if removing NaN values results in losing more than 15% of the data.
@@ -250,3 +251,81 @@ def apply_pca_numerical_only(df, columns='all', pca_min=0.5):
     result_df = pd.DataFrame(summary_info)
     
     return result_df.reset_index(drop=True)
+
+def explode_datetime_col(df, col_name):
+    """
+    Expands a datetime column into separate columns for hour, day of month, day of week, and day name.
+
+    This function takes a DataFrame and a column name as input. It converts the specified column to datetime format 
+    (if not already in that format) and then extracts and adds new columns to the DataFrame for the hour, day of the 
+    month, day of the week, and a descriptive day name (e.g., "Monday", "Tuesday").
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame containing the datetime column to be expanded.
+    - col_name (str): The name of the column in the DataFrame that contains datetime information.
+
+    Returns:
+    - pd.DataFrame: The original DataFrame with the added columns for hour ('Hour'), day of the month ('Day'), 
+      day of the week ('DayOfWeek'), and the descriptive name of the day ('DayName'). Note that the function modifies 
+      the DataFrame in place and also returns it.
+
+    Example usage:
+    >>> df = pd.DataFrame({'Date/Time': ['2021-01-01 12:00:00', '2021-01-02 13:00:00']})
+    >>> df = explode_datetime_col(df, 'Date/Time')
+    >>> df.columns
+    Index(['Date/Time', 'Hour', 'Day', 'DayOfWeek', 'DayName'], dtype='object')
+    """
+    # Convert 'Date/Time' to datetime
+    df[col_name] = pd.to_datetime(df[col_name])
+    # Extract hour and create a new column
+    df['Hour'] = df[col_name].dt.hour
+    # Extract day and create a new column (day of month)
+    df['Day'] = df[col_name].dt.day
+    # Extract day of week and create a new column
+    df['DayOfWeek'] = df[col_name].dt.dayofweek  # Monday=0, Sunday=6
+    # Extract a descriptive day name and create a new column
+    df['DayName'] = df[col_name].dt.day_name()
+
+    return df
+
+def plot_optimal_k_kmeans(X, max_k=10):
+    """
+    Plots the WCSS values against the number of clusters for KMeans clustering using the Elbow Method.
+    Pinpoints the second and third potential optimal k values directly on the plot.
+    
+    Parameters:
+    - X: feature array or DataFrame to cluster.
+    - max_k: maximum number of clusters to try (default is 10).
+    
+    The function does not return any value but displays a plot with the WCSS curve and marks the second and third suggested optimal k values.
+    """
+    wcss = []
+    for i in range(1, max_k + 1):
+        kmeans = KMeans(n_clusters=i, random_state=0, init='k-means++', n_init=10)
+        kmeans.fit(X)
+        wcss.append(kmeans.inertia_)
+
+    # Calculate gradients and second derivatives to find elbow points
+    gradients = np.diff(wcss) * -1
+    second_derivative = np.diff(gradients)
+
+    # Identifying elbow points; focusing on the second and a new third potential elbow
+    elbow_point1 = np.argmin(np.diff(gradients)) + 1
+    elbow_point2 = np.argmin(second_derivative) + 2  # Second potential elbow
+    # Introducing a third potential elbow point based on further analysis (for simplicity, we take the next significant change)
+    elbow_point3 = elbow_point2 + np.argmin(second_derivative[elbow_point2:]) + 1  # This is a simplified assumption
+
+    # Create DataFrame for plotting
+    wcss_frame = pd.DataFrame({'Number of Clusters': range(1, max_k + 1), 'WCSS': wcss})
+
+    # Plotting
+    fig = px.line(wcss_frame, x='Number of Clusters', y='WCSS', markers=True, title='WCSS per Number of Clusters')
+    fig.update_layout(yaxis_title="WCSS", xaxis_title="Number of Clusters")
+    
+    # Add markers for suggested optimal k values (focusing on elbow_point2 and elbow_point3)
+    fig.add_scatter(x=[elbow_point2 + 1, elbow_point3 + 1], y=[wcss[elbow_point2], wcss[elbow_point3]],
+                    mode='markers', marker=dict(size=10, color='Red'),
+                    name='Suggested k')
+
+    # Show the plot
+    fig.show()
