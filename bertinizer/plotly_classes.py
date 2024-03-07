@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import KMeans
+from sklearn.pipeline import make_pipeline
 import warnings
 
 def plot_data(df, y=None, columns='all'):
@@ -169,13 +170,14 @@ def dataset_overview_simplified(df, remove_nan=False):
 
     return overview_df
 
-def find_pca_num_only(df, columns='all', pca_min=0.5):
+def find_pca_num_only(df, columns='all', pca_min=0.10):
     """
-    Applies PCA to the given DataFrame, focusing only on numerical columns.
-    Checks if removing NaN values results in losing more than 15% of the data.
-    If so, issues a warning and halts further processing.
-    Otherwise, returns a DataFrame that includes variance ratios for PCA components,
-    identifies non-processed categorical columns, and integrates information on missing value removal.
+    Applies PCA or TruncatedSVD to the given DataFrame, focusing only on numerical columns,
+    depending on whether the input is dense or sparse. Checks if removing NaN values results
+    in losing more than 15% of the data. If so, issues a warning and halts further processing.
+    Otherwise, returns a DataFrame that includes variance ratios for PCA components or
+    TruncatedSVD singular values, identifies non-processed categorical columns,
+    and integrates information on missing value removal.
 
     Parameters:
     - df: pd.DataFrame - The DataFrame to process.
@@ -188,34 +190,30 @@ def find_pca_num_only(df, columns='all', pca_min=0.5):
     if columns != 'all':
         df = df[columns]
     
-    # Record original size for missing value calculations
     original_size = len(df)
-    
-    # Remove rows with any missing values and calculate the impact
     df_dropped_na = df.dropna()
     removed_na_count = original_size - len(df_dropped_na)
     removed_na_percentage = (removed_na_count / original_size) * 100 if original_size > 0 else 0
     
-    # Check if more than 15% of the data would be removed, if so, issue a warning
     if removed_na_percentage > 15:
         warnings.warn("Removing NaN values results in losing more than 15% of the dataset. Consider alternative missing value handling.")
-        return pd.DataFrame()  # Return an empty DataFrame as a signal of halting the operation
+        return pd.DataFrame()
     
-    # Identify numerical and categorical columns after dropping NA
     numeric_features = df_dropped_na.select_dtypes(include=np.number).columns
     categorical_features = df_dropped_na.select_dtypes(exclude=np.number).columns
 
-    # Apply StandardScaler to numerical columns and fit PCA
-    pca_components, variance_ratios = 0, []
+    is_sparse = df_dropped_na[numeric_features].sparse.density < 1 if hasattr(df_dropped_na[numeric_features], 'sparse') else False
+
+    dim_reduction_method = TruncatedSVD(n_components=pca_min, algorithm='randomized') if is_sparse else PCA(n_components=pca_min, svd_solver='full')
+    scaler = StandardScaler(with_mean=not is_sparse)  # Disable mean centering for sparse data to avoid converting to dense
+
+    # Process only if there are numeric features
     if len(numeric_features) > 0:
-        scaler = StandardScaler()
-        scaled_numeric_df = scaler.fit_transform(df_dropped_na[numeric_features])
-        pca = PCA(n_components=pca_min, svd_solver='full')
-        pca.fit(scaled_numeric_df)
-        pca_components = pca.n_components_
-        variance_ratios = pca.explained_variance_ratio_
-    
-    # Building the summary information
+        pipeline = make_pipeline(scaler, dim_reduction_method)
+        pipeline.fit(df_dropped_na[numeric_features])
+        components_count = dim_reduction_method.n_components_ if is_sparse else dim_reduction_method.n_components_
+        variance_ratios = dim_reduction_method.explained_variance_ratio_ if not is_sparse else 'N/A for SVD'
+        
     summary_info = {
         'Component': [],
         'Variance Ratio': [],
@@ -223,33 +221,27 @@ def find_pca_num_only(df, columns='all', pca_min=0.5):
         'Info': []
     }
     
-    # Add PCA component information
-    for i in range(pca_components):
-        summary_info['Component'].append(f'PCA {i+1}')
-        summary_info['Variance Ratio'].append(variance_ratios[i])
+    for i in range(components_count):
+        summary_info['Component'].append(f'PCA/SVD {i+1}')
+        summary_info['Variance Ratio'].append(variance_ratios[i] if variance_ratios != 'N/A for SVD' else 'N/A')
         summary_info['Status'].append('Processed')
         summary_info['Info'].append('')
         
-    # Add categorical column information
     for cat_col in categorical_features:
         summary_info['Component'].append(cat_col)
         summary_info['Variance Ratio'].append('N/A')
         summary_info['Status'].append('Non-processed (Categorical)')
         summary_info['Info'].append('')
     
-    # Add missing value information
     summary_info['Component'].append('Missing Value Info')
     summary_info['Variance Ratio'].append('N/A')
     summary_info['Status'].append('Missing Value Removal')
     summary_info['Info'].append(f'Missing values removed: {removed_na_count}, Percentage of total: {removed_na_percentage:.2f}%')
 
-    # Additional PCA information
-    if pca_components > 0:
-        summary_info['Info'][0] = f'Minimum variance for PCA: {pca_min}, Original dimensions: {len(numeric_features)}, PCA components: {pca_components}'
+    if components_count > 0:
+        summary_info['Info'][0] = f'Minimum variance for PCA/SVD: {pca_min}, Original dimensions: {len(numeric_features)}, Components: {components_count}'
     
-    # Construct final summary DataFrame
     result_df = pd.DataFrame(summary_info)
-    
     return result_df.reset_index(drop=True)
 
 def explode_datetime_col(df, col_name):
